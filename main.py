@@ -1,4 +1,4 @@
-from math import log
+from math import gcd, log
 
 from reservoirpy.nodes import Reservoir, Ridge
 import numpy as np
@@ -78,39 +78,49 @@ def search(data, window):
 
 def interpolate(space, index, window, functions, shape=None):
     """
-    This function "zooms in" on the specified hyperparameter space and returns the 
+    This function "zooms in" on the specified hyperparameter space and returns the
     interpolated subspace.
 
     space:
-        The hyperparameter space. It is a sequence of numpy arrays
-        with each array corresponding to a hyperparameter set. This function takes a subset
-        of the hyperparameter space and interpolates the values using the function
-        associated with the hyperparameter (specified as `functions`) such that the resulting
+        The hyperparameter space. It is a sequence of numpy arrays with each array
+        corresponding to a hyperparameter set. This function takes a subset of the
+        hyperparameter space and interpolates the values using the function associated
+        with the hyperparameter (specified as `functions`) such that the resulting
         subspace has the same shape as the original.
 
     index:
-        The lower bound of the hyperparameter subspace relative to the existing space.
-        It is a sequence of integers, each corresponding to an index of its associated
+        The lower bound of the hyperparameter subspace relative to the parent space. It
+        is a sequence of integers, each corresponding to an index of its associated
         hyperparameter set in the `space` sequence.
 
     window:
-        The shape of the hyperparameter subspace to consider. Used to determine the upper
-        bound of the subspace relative to the existing space. It is a sequence of
+        The shape of the hyperparameter subspace to consider. Used to determine the
+        upper bound of the subspace relative to the parent space. It is a sequence of
         integers, each corresponding to an offset against its associated index in the
         `index` sequence.
 
     shape:
-        The shape of the subspace to return. Defaults to (window * 2) + 1.
+        The shape of the subspace to return. Defaults to the parent space's shape if all
+        dimensions share a greatest common denominator greater than 1 with the specified
+        window. Otherwise, defaults to (window * 2) + 1.
 
     NOTE: Each input sequence should have the same length.
     """
     if shape is None:
-        shape = [(w * 2) + 1 for w in window]
+        shape_ = [len(s) for s in space]
+        if any((s > w for s, w in zip(shape_, window))) and all(
+            (gcd(s, w) > 1 for s, w in zip(shape_, window))
+        ):
+            shape = shape_
+        else:
+            shape = [(w * 2) + 1 for w in window]
     subspace = []
     for d, i, w, f, s in zip(space, index, window, functions, shape):
-        subspace.append(
-            f(d[i], d[i + w], s)
-            if isinstance(f, type(np.linspace))
-            else f(log(d[i]), log(d[i + w]), s, base=10)
-        )
+        subspace.append(f(d[i], d[i + w], s))
     return subspace
+
+
+def logspace(base=10):
+    return lambda start, stop, n: np.logspace(
+        log(start, base=base), log(stop, base=base), n, base=base
+    )
